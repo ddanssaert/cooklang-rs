@@ -1230,7 +1230,7 @@ impl<'i> RecipeCollector<'i, '_> {
             //   - is not ref
             // except ref and new, the only modifiers a reference can have is those inherited
             // from the definition. And if it has it's not treated as a reference.
-            let conflict = *new.modifiers() & !inherited & !Modifiers::REF;
+            let conflict = *new.modifiers() & !inherited & !Modifiers::REF & !C::allowed_on_ref();
 
             // Apply inherited
             *new.modifiers_mut() |= inherited;
@@ -1284,6 +1284,10 @@ trait RefComponent: Sized {
     fn modifiers_mut(&mut self) -> &mut Modifiers;
 
     fn inherit_modifiers() -> Modifiers;
+
+    fn allowed_on_ref() -> Modifiers {
+        Modifiers::empty()
+    }
 
     fn container() -> &'static str;
 
@@ -1360,6 +1364,10 @@ impl RefComponent for Cookware<ScalableValue> {
     #[inline]
     fn inherit_modifiers() -> Modifiers {
         Modifiers::HIDDEN | Modifiers::OPT
+    }
+
+    fn allowed_on_ref() -> Modifiers {
+        Modifiers::PRIMARY
     }
 
     #[inline]
