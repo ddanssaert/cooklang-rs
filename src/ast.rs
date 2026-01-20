@@ -38,10 +38,11 @@ pub fn build_ast<'i>(events: impl Iterator<Item = Event<'i>>) -> PassResult<Ast<
             Event::Start(_kind) => items.clear(),
             Event::End(kind) => {
                 match kind {
-                    BlockKind::Step => {
-                        if !items.is_empty() {
+                    BlockKind::Step { name } => {
+                        if !items.is_empty() || name.is_some() {
                             blocks.push(Block::Step {
                                 items: std::mem::take(&mut items),
+                                name, // Pass the name to the Block::Step
                             })
                         }
                     }

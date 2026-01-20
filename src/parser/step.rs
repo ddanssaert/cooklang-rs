@@ -11,31 +11,123 @@ use super::{
 };
 
 pub(crate) fn parse_step(bp: &mut BlockParser<'_, '_>) {
-    bp.event(Event::Start(BlockKind::Step));
+    let mut name = None;
+
+    // --- PHASE 1: Detection (Calculate indices without mutating) ---
+    // Check for "**" (Double Star) at the current position
+    let label_indices = {
+        let tokens = bp.tokens();
+        let cur = bp.current;
+        
+        let is_double_star = tokens.len() > cur + 1 
+            && tokens[cur].kind == T![*] 
+            && tokens[cur + 1].kind == T![*];
+
+        if bp.extension(Extensions::STEP_LABELS) && is_double_star {
+            // Scan forward for the closing "**"
+            let mut end_pos = None;
+            for i in (cur + 2)..tokens.len() {
+                // Stop at newline (labels shouldn't span lines)
+                if tokens[i].kind == T![newline] {
+                    break;
+                }
+                // Check for closing "**"
+                if i + 1 < tokens.len() && tokens[i].kind == T![*] && tokens[i + 1].kind == T![*] {
+                    end_pos = Some(i);
+                    break;
+                }
+            }
+            end_pos.map(|end| (cur + 2, end))
+        } else {
+            None
+        }
+    };
+
+    // --- PHASE 2: Extraction & Consumption (Mutating) ---
+    if let Some((content_start, content_end)) = label_indices {
+        // 1. Extract the text (Borrow briefly)
+        {
+            let tokens = bp.tokens();
+            let content_slice = &tokens[content_start..content_end];
+            if !content_slice.is_empty() {
+                // We must provide the exact offset of the first token in the slice
+                let offset = content_slice[0].span.start();
+                name = Some(bp.text(offset, content_slice));
+            }
+        }
+
+        // 2. Consume the tokens (Bump parser)
+        // Opening "**" + Content + Closing "**"
+        // Length to consume = (content_end + 2) - current
+        let count = (content_end + 2) - bp.current;
+        for _ in 0..count {
+            bp.bump_any();
+        }
+
+        // 3. Optional: Eat trailing colon "**Label:**"
+        if bp.at(T![:]) {
+            bp.bump_any();
+        }
+
+        // 4. Eat trailing whitespace (The "Space" Fix)
+        bp.consume_while(|k| k == T![ws]);
+    }
+
+    // Pass the name to the Start event
+    bp.event(Event::Start(BlockKind::Step { name: name.clone() }));
+
+    // --- PHASE 3: Content Parsing (With Text Accumulation) ---
+    let mut text_start = None; // Tracks the start index of the current text run
 
     while !bp.rest().is_empty() {
+        let start_of_component = bp.current;
+
+        // Try to parse a component
         let component = match bp.peek() {
             T![@] => bp.with_recover(ingredient),
             T![#] => bp.with_recover(cookware),
             T![~] => bp.with_recover(timer),
             _ => None,
         };
+
         if let Some(ev) = component {
-            bp.event(ev)
-        } else {
-            let start = bp.current_offset();
-            let tokens = bp.capture_slice(|bp| {
-                bp.bump_any(); // consume the first token, this avoids entering an infinite loop
-                bp.consume_while(|t| !matches!(t, T![@] | T![#] | T![~]));
-            });
-            let text = bp.text(start, tokens);
-            if !text.fragments().is_empty() {
-                bp.event(Event::Text(text));
+            // A component was found! 
+            // 1. Flush any pending text we collected before this component
+            if let Some(start) = text_start {
+                let end = start_of_component; // <--- This prevents overlap
+                let slice = &bp.tokens()[start..end];
+                if !slice.is_empty() {
+                    let offset = slice[0].span.start();
+                    let t = bp.text(offset, slice);
+                    bp.event(Event::Text(t));
+                }
+                text_start = None;
             }
+
+            // 2. Emit the component event
+            bp.event(ev);
+        } else {
+            // No component found (or parse failed). Treat this token as text.
+            if text_start.is_none() {
+                text_start = Some(bp.current);
+            }
+            bp.bump_any();
         }
     }
 
-    bp.event(Event::End(BlockKind::Step));
+    // --- PHASE 4: Final Flush ---
+    // Emit any remaining text at the end of the line
+    if let Some(start) = text_start {
+        let end = bp.current;
+        let slice = &bp.tokens()[start..end];
+        if !slice.is_empty() {
+            let offset = slice[0].span.start();
+            let t = bp.text(offset, slice);
+            bp.event(Event::Text(t));
+        }
+    }
+
+    bp.event(Event::End(BlockKind::Step { name }));
 }
 
 struct Body<'t> {

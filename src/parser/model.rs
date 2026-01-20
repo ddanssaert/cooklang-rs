@@ -22,6 +22,9 @@ pub enum Block<'a> {
         /// This is in order, so to form the representation of the step just
         /// iterate over the items and process them in that order.
         items: Vec<Item<'a>>,
+        
+        /// Optional step label (Extension)
+        name: Option<Text<'a>>,
     },
     /// A paragraph of instructions
     TextBlock(Vec<Text<'a>>),

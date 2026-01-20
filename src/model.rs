@@ -127,6 +127,9 @@ pub struct Step {
     /// The step numbers start at 1 in each section and increase with non
     /// text step.
     pub number: u32,
+
+    /// Optional step label
+    pub name: Option<String>
 }
 
 /// A step item

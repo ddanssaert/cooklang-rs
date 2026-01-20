@@ -140,7 +140,7 @@ impl<'i> RecipeCollector<'i, '_> {
                         BlockBuffer::Text(String::new())
                     } else {
                         match kind {
-                            BlockKind::Step => BlockBuffer::Step(Vec::new()),
+                            BlockKind::Step { .. } => BlockBuffer::Step(Vec::new()),
                             BlockKind::Text => BlockBuffer::Text(String::new()),
                         }
                     };
@@ -149,10 +149,19 @@ impl<'i> RecipeCollector<'i, '_> {
                 Event::End(kind) => {
                     let new_content = match current_block {
                         Some(BlockBuffer::Step(items)) => {
-                            assert_eq!(kind, BlockKind::Step);
+                            assert!(matches!(kind, BlockKind::Step { .. }));
+
+                            // Extract the name from the End event
+                            let name = if let BlockKind::Step { name } = kind {
+                                name
+                            } else {
+                                panic!("End event kind mismatch or not a step")
+                            };
+
                             Content::Step(Step {
                                 items,
                                 number: self.step_counter,
+                                name: name.map(|t| t.text_trimmed().into_owned()), 
                             })
                         }
                         Some(BlockBuffer::Text(text)) => {
