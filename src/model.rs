@@ -534,4 +534,5 @@ pub struct Timer {
     /// - If the [`TIMER_REQUIRES_TIME`](crate::Extensions::TIMER_REQUIRES_TIME)
     ///   extension is enabled, this is guaranteed to be [`Some`].
     pub quantity: Option<Quantity>,
+    pub modifiers: Modifiers,
 }

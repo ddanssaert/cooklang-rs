@@ -1011,6 +1011,7 @@ impl<'i> RecipeCollector<'i, '_> {
         let new_timer = Timer {
             name: timer.name.map(|t| t.text_trimmed().into_owned()),
             quantity,
+            modifiers: timer.modifiers.into_inner(),
         };
 
         self.content.timers.push(new_timer);
