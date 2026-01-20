@@ -129,15 +129,15 @@ bitflags! {
         /// This extensions also enables [`Self::COMPONENT_MODIFIERS`].
         const INTERMEDIATE_PREPARATIONS = 1 << 11 | Self::COMPONENT_MODIFIERS.bits();
         /// Enables titles for steps
-        const STEP_LABELS       = 1 << 12;
+        const STEP_LABELS              = 1 << 12;
         /// Enable locations
-        const PRIMARY_COOKWARE  = 1 << 13;
+        const PRIMARY_COMPONENT        = 1 << 13;
         /// Enable work timers
-        const ACTIVE_TIME       = 1 << 14;
+        // const ACTIVE_TIME              = 1 << 14;
         /// Enable scalable timers
-        const SCALABLE_TIMERS   = 1 << 15;
+        // const SCALABLE_TIMERS          = 1 << 15;
         /// Enables explicit output preparations
-        const EXPLICIT_OUTPUTS  = 1 << 16;
+        // const EXPLICIT_OUTPUTS         = 1 << 16;
 
         /// Enables a subset of extensions to maximize compatibility with other
         /// cooklang parsers.
