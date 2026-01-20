@@ -165,7 +165,7 @@ async function run(): Promise<void> {
         ["STEP_LABELS", 1 << 12],
         ["PRIMARY_COMPONENT", 1 << 13],
         ["ACTIVE_TIME", 1 << 14],
-        // ["SCALABLE_TIMERS", 1 << 15],
+        ["SCALABLE_TIMERS", 1 << 15],
         // ["EXPLICIT_OUTPUTS", 1 << 16],
     ];
 
