@@ -196,6 +196,8 @@ bitflags! {
         const NEW            = 1 << 4;
         /// Marks the component as primary/active (*)
         const PRIMARY        = 1 << 5;
+        /// Marks the component as an explicit output (->)
+        const OUTPUT  = 1 << 6;
     }
 }
 
