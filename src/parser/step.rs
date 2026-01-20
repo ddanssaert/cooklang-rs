@@ -93,16 +93,31 @@ pub(crate) fn parse_step(bp: &mut BlockParser<'_, '_>) {
             false
         };
 
+        if is_arrow && bp.extension(Extensions::EXPLICIT_OUTPUTS) {
+             // Flush any pending text before the arrow
+             if let Some(start) = text_start {
+                let end = start_of_component;
+                let slice = &bp.tokens()[start..end];
+                if !slice.is_empty() {
+                    let offset = slice[0].span.start();
+                    let t = bp.text(offset, slice);
+                    bp.event(Event::Text(t));
+                }
+                text_start = None;
+             }
+
+             // Parse the list of outputs
+             parse_explicit_outputs(bp);
+             
+             // Continue main loop (skips the match below)
+             continue; 
+        }
+
         // Try to parse a component
         let component = match bp.peek() {
             T![@] => bp.with_recover(ingredient),
             T![#] => bp.with_recover(cookware),
             T![~] => bp.with_recover(timer),
-            
-            // Handle '->'
-            T![-] if is_arrow && bp.extension(Extensions::EXPLICIT_OUTPUTS) => {
-                 bp.with_recover(explicit_output)
-            }
             
             _ => None,
         };
@@ -677,47 +692,49 @@ fn timer<'i>(bp: &mut BlockParser<'_, 'i>) -> Option<Event<'i>> {
     )))
 }
 
-fn explicit_output<'i>(bp: &mut BlockParser<'_, 'i>) -> Option<Event<'i>> {
+// Helper to check for a comma token by looking at the source text
+fn at_comma(bp: &BlockParser) -> bool {
+    if bp.current >= bp.tokens().len() {
+        return false;
+    }
+    let span = bp.tokens()[bp.current].span;
+    // We access the input directly to check if the token text is ","
+    &bp.input[span.range()] == ","
+}
+
+// Parses a single output item: "@name{qty}"
+fn explicit_output_item<'i>(bp: &mut BlockParser<'_, 'i>) -> Option<Event<'i>> {
     let start = bp.current_offset();
     
-    // 1. Consume "->"
-    bp.bump_any(); // -
-    bp.bump_any(); // >
-    
-    // 2. Consume whitespace
+    // 1. Consume optional whitespace & @
     bp.consume_while(|k| k == T![ws]);
-    
-    // 3. Consume optional '@' 
     let _ = bp.consume(T![@]);
 
+    // 2. Parse modifiers (allow hidden '-')
     let modifiers_pos = bp.current_offset();
-    
-    // 4. Parse Modifiers (false, false = no * or + allowed)
     let modifiers_tokens = modifiers(bp, false, false);
     
+    // 3. Parse Body (name + quantity)
     let name_offset = bp.current_offset();
     let body = comp_body(bp)?;
     let end = bp.current_offset();
 
-    // 5. Parse flags & Force OUTPUT
+    // 4. Create modifiers with OUTPUT flag
     let parsed_modifiers = parse_modifiers(bp, modifiers_tokens, modifiers_pos);
-    
-    // FIX: Destructure to modify inner flags
     let (mut flags, span) = check_intermediate_data(bp, parsed_modifiers, "explicit output").take_pair();
     flags |= Modifiers::OUTPUT;
     let modifiers = Located::new(flags, span);
 
-    // Validation
+    // 5. Validation
     check_alias(bp, body.name, "explicit output");
     check_note(bp, "explicit output");
     let name = bp.text(name_offset, body.name);
     check_empty_name("explicit output", bp, &name);
-
     let quantity = body.quantity.map(|tokens| parse_quantity(bp, tokens).quantity);
 
     Some(Event::Ingredient(Located::new(
         Ingredient {
-            modifiers, // Use the fixed modifiers
+            modifiers,
             intermediate_data: None,
             name,
             alias: None,
@@ -726,6 +743,34 @@ fn explicit_output<'i>(bp: &mut BlockParser<'_, 'i>) -> Option<Event<'i>> {
         },
         start..end,
     )))
+}
+
+// Parses the list "-> @a, @b"
+fn parse_explicit_outputs(bp: &mut BlockParser) {
+    // 1. Consume the arrow "->" manually
+    bp.bump_any(); // Consume '-'
+    bp.bump_any(); // Consume '>'
+    
+    loop {
+        // 2. Parse one item
+        if let Some(ev) = bp.with_recover(explicit_output_item) {
+             bp.event(ev);
+        } else {
+             break;
+        }
+
+        // 3. Check for comma to continue
+        let save = bp.current;
+        bp.consume_while(|k| k == T![ws]);
+        
+        // Use our helper instead of T![,]
+        if at_comma(bp) {
+            bp.bump_any(); // Consume comma
+        } else {
+            bp.current = save; // Restore position (put back whitespace)
+            break; 
+        }
+    }
 }
 
 fn check_intermediate_data(
