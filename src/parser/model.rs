@@ -95,6 +95,7 @@ pub struct Timer<'a> {
     /// If the [`TIMER_REQUIRES_TIME`](crate::Extensions::TIMER_REQUIRES_TIME)
     /// extension is enabled, this is guaranteed to be [`Some`].
     pub quantity: Option<Located<Quantity<'a>>>,
+    pub modifiers: Located<Modifiers>,
 }
 
 /// Quantity used in [items](Item)

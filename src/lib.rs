@@ -133,7 +133,7 @@ bitflags! {
         /// Enable locations
         const PRIMARY_COMPONENT        = 1 << 13;
         /// Enable work timers
-        // const ACTIVE_TIME              = 1 << 14;
+        const ACTIVE_TIME              = 1 << 14;
         /// Enable scalable timers
         // const SCALABLE_TIMERS          = 1 << 15;
         /// Enables explicit output preparations

@@ -548,13 +548,23 @@ fn timer<'i>(bp: &mut BlockParser<'_, 'i>) -> Option<Event<'i>> {
     // Parse
     let start = bp.current_offset();
     bp.consume(T![~])?;
-    let modifiers_tokens = modifiers(bp, false);
+    let modifiers_pos = bp.current_offset();
+    let modifiers_tokens = modifiers(bp, bp.extension(Extensions::ACTIVE_TIME));
     let name_offset = bp.current_offset();
     let body = comp_body(bp)?;
     let end = bp.current_offset();
 
+    // We reuse check_intermediate_data to ensure timers don't use '&' (intermediate refs)
+    let ParsedModifiers {
+        flags: modifiers,
+        intermediate_data: _, // timers don't support intermediate refs
+    } = parse_modifiers(bp, modifiers_tokens, modifiers_pos);
+
+    // Re-verify that no intermediate data was passed (reuse cookware logic or explicit check)
+    // Since parse_modifiers returns the data, let's just use the check helper:
+    let modifiers = check_intermediate_data(bp, ParsedModifiers { flags: modifiers, intermediate_data: None }, TIMER);
+
     // Errors
-    check_modifiers(bp, modifiers_tokens, TIMER);
     check_alias(bp, body.name, TIMER);
     check_note(bp, TIMER);
 
@@ -619,7 +629,7 @@ fn timer<'i>(bp: &mut BlockParser<'_, 'i>) -> Option<Event<'i>> {
     }
 
     Some(Event::Timer(Located::new(
-        Timer { name, quantity },
+        Timer { name, quantity, modifiers },
         start..end,
     )))
 }
