@@ -179,7 +179,11 @@ fn comp_body<'t>(bp: &mut BlockParser<'t, '_>) -> Option<Body<'t>> {
     })
 }
 
-fn modifiers<'t>(bp: &mut BlockParser<'t, '_>, allow_star: bool) -> &'t [Token] {
+fn modifiers<'t>(
+    bp: &mut BlockParser<'t, '_>, 
+    allow_star: bool, 
+    allow_plus: bool
+) -> &'t [Token] {
     if !bp.extension(Extensions::COMPONENT_MODIFIERS) {
         return &[];
     }
@@ -187,12 +191,19 @@ fn modifiers<'t>(bp: &mut BlockParser<'t, '_>, allow_star: bool) -> &'t [Token] 
     let start = bp.current;
     loop {
         match bp.peek() {
-            T![@] | T![?] | T![+] | T![-] => {
+            // Standard modifiers (Always allowed)
+            T![@] | T![?] | T![-] => {
                 bp.bump_any();
             }
+            // Conditional modifiers
             T![*] if allow_star => {
                 bp.bump_any();
             }
+            // '+' is now conditional (It was standard before)
+            T![+] if allow_plus => {
+                bp.bump_any();
+            }
+            // Reference modifier
             T![&] => {
                 bp.bump_any();
                 if bp.extension(Extensions::INTERMEDIATE_PREPARATIONS) {
@@ -425,7 +436,7 @@ fn ingredient<'i>(bp: &mut BlockParser<'_, 'i>) -> Option<Event<'i>> {
     let start = bp.current_offset();
     bp.consume(T![@])?;
     let modifiers_pos = bp.current_offset();
-    let modifiers_tokens = modifiers(bp, false);
+    let modifiers_tokens = modifiers(bp, false, true);
     let name_offset = bp.current_offset();
     let body = comp_body(bp)?;
     let note = note(bp);
@@ -439,6 +450,13 @@ fn ingredient<'i>(bp: &mut BlockParser<'_, 'i>) -> Option<Event<'i>> {
         flags: modifiers,
         intermediate_data,
     } = parse_modifiers(bp, modifiers_tokens, modifiers_pos);
+
+    if modifiers.contains(Modifiers::PRIMARY) {
+        bp.error(error!(
+            "Invalid ingredient modifier: primary (*) not supported",
+            label!(modifiers.span(), "remove this")
+        ));
+    }
 
     let quantity = body
         .quantity
@@ -462,7 +480,7 @@ fn cookware<'i>(bp: &mut BlockParser<'_, 'i>) -> Option<Event<'i>> {
     let start = bp.current_offset();
     bp.consume(T![#])?;
     let modifiers_pos = bp.current_offset();
-    let modifiers_tokens = modifiers(bp, bp.extension(Extensions::PRIMARY_COMPONENT));
+    let modifiers_tokens = modifiers(bp, bp.extension(Extensions::PRIMARY_COMPONENT), true);
     let name_offset = bp.current_offset();
     let body = comp_body(bp)?;
     let note = note(bp);
@@ -506,13 +524,10 @@ fn cookware<'i>(bp: &mut BlockParser<'_, 'i>) -> Option<Event<'i>> {
     let modifiers = parse_modifiers(bp, modifiers_tokens, modifiers_pos);
 
     if modifiers.flags.contains(Modifiers::PRIMARY) && !bp.extension(Extensions::PRIMARY_COMPONENT) {
-        bp.error(
-            error!(
-                "Invalid cookware modifier: primary (*) not enabled",
-                label!(modifiers.flags.span(), "remove this"),
-            )
-            .hint("Enable the PRIMARY_COMPONENT extension to use this feature"),
-        );
+        bp.error(error!(
+            "Invalid cookware modifier: primary location (*) not enabled",
+            label!(modifiers.flags.span(), "remove this")
+        ));
     }
 
     let modifiers = check_intermediate_data(bp, modifiers, COOKWARE);
@@ -549,20 +564,34 @@ fn timer<'i>(bp: &mut BlockParser<'_, 'i>) -> Option<Event<'i>> {
     let start = bp.current_offset();
     bp.consume(T![~])?;
     let modifiers_pos = bp.current_offset();
-    let modifiers_tokens = modifiers(bp, bp.extension(Extensions::ACTIVE_TIME));
+    let modifiers_tokens = modifiers(
+        bp, 
+        bp.extension(Extensions::ACTIVE_TIME),    // allow_star
+        bp.extension(Extensions::SCALABLE_TIMERS) // allow_plus
+    );
     let name_offset = bp.current_offset();
     let body = comp_body(bp)?;
     let end = bp.current_offset();
 
-    // We reuse check_intermediate_data to ensure timers don't use '&' (intermediate refs)
-    let ParsedModifiers {
-        flags: modifiers,
-        intermediate_data: _, // timers don't support intermediate refs
-    } = parse_modifiers(bp, modifiers_tokens, modifiers_pos);
+    let parsed_modifiers = parse_modifiers(bp, modifiers_tokens, modifiers_pos);
 
-    // Re-verify that no intermediate data was passed (reuse cookware logic or explicit check)
-    // Since parse_modifiers returns the data, let's just use the check helper:
-    let modifiers = check_intermediate_data(bp, ParsedModifiers { flags: modifiers, intermediate_data: None }, TIMER);
+    let modifiers = check_intermediate_data(bp, parsed_modifiers, TIMER);
+
+    if modifiers.contains(Modifiers::PRIMARY) && !bp.extension(Extensions::ACTIVE_TIME) {
+         return None; 
+    }
+    
+    if modifiers.contains(Modifiers::NEW) && !bp.extension(Extensions::SCALABLE_TIMERS) {
+         return None;
+    }
+    
+    let allowed = Modifiers::PRIMARY | Modifiers::NEW;
+    if modifiers.intersects(!allowed) {
+         bp.error(error!(
+            "Invalid timer modifier",
+            label!(modifiers.span(), "timers only support * (active) and + (scalable)")
+         ));
+    }
 
     // Errors
     check_alias(bp, body.name, TIMER);

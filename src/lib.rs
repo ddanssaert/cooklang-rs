@@ -135,7 +135,7 @@ bitflags! {
         /// Enable work timers
         const ACTIVE_TIME              = 1 << 14;
         /// Enable scalable timers
-        // const SCALABLE_TIMERS          = 1 << 15;
+        const SCALABLE_TIMERS          = 1 << 15;
         /// Enables explicit output preparations
         // const EXPLICIT_OUTPUTS         = 1 << 16;
 

@@ -982,7 +982,7 @@ impl<'i> RecipeCollector<'i, '_> {
     fn timer(&mut self, timer: Located<parser::Timer<'i>>) -> usize {
         let located_timer = timer.clone();
         let (timer, _span) = timer.take_pair();
-        let quantity = timer.quantity.map(|q| {
+        let mut quantity = timer.quantity.map(|q| {
             let quantity = self.quantity(q, false);
             if self.extensions.contains(Extensions::ADVANCED_UNITS) {
                 let located_quantity = located_timer.quantity.as_ref().unwrap();
@@ -1016,6 +1016,12 @@ impl<'i> RecipeCollector<'i, '_> {
             }
             quantity
         });
+
+        if timer.modifiers.contains(Modifiers::NEW) {
+            if let Some(q) = &mut quantity {
+                q.scalable = true;
+            }
+        }
 
         let new_timer = Timer {
             name: timer.name.map(|t| t.text_trimmed().into_owned()),
