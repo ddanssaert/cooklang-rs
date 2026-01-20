@@ -1263,22 +1263,6 @@ impl<'i> RecipeCollector<'i, '_> {
         }
     }
 
-    fn find_step_index_for_ingredient(&self, ingredient_index: usize) -> Option<usize> {
-        // We iterate over the current section's content to find the step
-        for (content_idx, content) in self.current_section.content.iter().enumerate() {
-             if let Content::Step(step) = content {
-                 for item in &step.items {
-                     if let Item::Ingredient { index } = item {
-                         if *index == ingredient_index {
-                             return Some(content_idx);
-                         }
-                     }
-                 }
-             }
-        }
-        None
-    }
-
 }
 
 trait RefComponent: Sized {
