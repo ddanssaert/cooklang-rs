@@ -677,20 +677,6 @@ fn timer<'i>(bp: &mut BlockParser<'_, 'i>) -> Option<Event<'i>> {
     )))
 }
 
-fn check_modifiers(bp: &mut BlockParser, modifiers_tokens: &[Token], container: &'static str) {
-    assert_ne!(container, INGREDIENT);
-    assert_ne!(container, COOKWARE);
-    if !modifiers_tokens.is_empty() {
-        bp.error(
-            error!(
-                format!("Invalid {container}: modifiers not allowed"),
-                label!(tokens_span(modifiers_tokens), "remove this"),
-            )
-            .hint("Modifiers are only available in ingredients and cookware items"),
-        );
-    }
-}
-
 fn explicit_output<'i>(bp: &mut BlockParser<'_, 'i>) -> Option<Event<'i>> {
     let start = bp.current_offset();
     
