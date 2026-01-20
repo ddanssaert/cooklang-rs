@@ -163,10 +163,10 @@ async function run(): Promise<void> {
         ["TIMER_REQUIRES_TIME", 1 << 10],
         ["INTERMEDIATE_PREPARATIONS", (1 << 11) | (1 << 1)],
         ["STEP_LABELS", 1 << 12],
-        ["PRIMARY_COOKWARE", 1 << 13],
-        ["ACTIVE_TIME", 1 << 14],
-        ["SCALABLE_TIMERS", 1 << 15],
-        ["EXPLICIT_OUTPUTS", 1 << 16],
+        ["PRIMARY_COMPONENT", 1 << 13],
+        // ["ACTIVE_TIME", 1 << 14],
+        // ["SCALABLE_TIMERS", 1 << 15],
+        // ["EXPLICIT_OUTPUTS", 1 << 16],
     ];
 
     extensions.forEach(([e, bits]) => {

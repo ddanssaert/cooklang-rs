@@ -179,7 +179,7 @@ fn comp_body<'t>(bp: &mut BlockParser<'t, '_>) -> Option<Body<'t>> {
     })
 }
 
-fn modifiers<'t>(bp: &mut BlockParser<'t, '_>) -> &'t [Token] {
+fn modifiers<'t>(bp: &mut BlockParser<'t, '_>, allow_star: bool) -> &'t [Token] {
     if !bp.extension(Extensions::COMPONENT_MODIFIERS) {
         return &[];
     }
@@ -188,6 +188,9 @@ fn modifiers<'t>(bp: &mut BlockParser<'t, '_>) -> &'t [Token] {
     loop {
         match bp.peek() {
             T![@] | T![?] | T![+] | T![-] => {
+                bp.bump_any();
+            }
+            T![*] if allow_star => {
                 bp.bump_any();
             }
             T![&] => {
@@ -252,6 +255,7 @@ fn parse_modifiers(
                 T![?] => Modifiers::OPT,
                 T![+] => Modifiers::NEW,
                 T![-] => Modifiers::HIDDEN,
+                T![*] => Modifiers::PRIMARY,
                 _ => panic!("Bad modifiers token sequence. Unexpected token: {tok:?}"),
             };
 
@@ -421,7 +425,7 @@ fn ingredient<'i>(bp: &mut BlockParser<'_, 'i>) -> Option<Event<'i>> {
     let start = bp.current_offset();
     bp.consume(T![@])?;
     let modifiers_pos = bp.current_offset();
-    let modifiers_tokens = modifiers(bp);
+    let modifiers_tokens = modifiers(bp, false);
     let name_offset = bp.current_offset();
     let body = comp_body(bp)?;
     let note = note(bp);
@@ -458,7 +462,7 @@ fn cookware<'i>(bp: &mut BlockParser<'_, 'i>) -> Option<Event<'i>> {
     let start = bp.current_offset();
     bp.consume(T![#])?;
     let modifiers_pos = bp.current_offset();
-    let modifiers_tokens = modifiers(bp);
+    let modifiers_tokens = modifiers(bp, bp.extension(Extensions::PRIMARY_COMPONENT));
     let name_offset = bp.current_offset();
     let body = comp_body(bp)?;
     let note = note(bp);
@@ -472,6 +476,17 @@ fn cookware<'i>(bp: &mut BlockParser<'_, 'i>) -> Option<Event<'i>> {
         .quantity
         .map(|tokens| parse_quantity(bp, tokens).quantity);
     let modifiers = parse_modifiers(bp, modifiers_tokens, modifiers_pos);
+
+    if modifiers.flags.contains(Modifiers::PRIMARY) && !bp.extension(Extensions::PRIMARY_COMPONENT) {
+        bp.error(
+            error!(
+                "Invalid cookware modifier: primary (*) not enabled",
+                label!(modifiers.flags.span(), "remove this"),
+            )
+            .hint("Enable the PRIMARY_COMPONENT extension to use this feature"),
+        );
+    }
+
     let modifiers = check_intermediate_data(bp, modifiers, COOKWARE);
 
     if modifiers.contains(Modifiers::RECIPE) {
@@ -505,7 +520,7 @@ fn timer<'i>(bp: &mut BlockParser<'_, 'i>) -> Option<Event<'i>> {
     // Parse
     let start = bp.current_offset();
     bp.consume(T![~])?;
-    let modifiers_tokens = modifiers(bp);
+    let modifiers_tokens = modifiers(bp, false);
     let name_offset = bp.current_offset();
     let body = comp_body(bp)?;
     let end = bp.current_offset();

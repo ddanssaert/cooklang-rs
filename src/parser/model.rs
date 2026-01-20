@@ -22,7 +22,7 @@ pub enum Block<'a> {
         /// This is in order, so to form the representation of the step just
         /// iterate over the items and process them in that order.
         items: Vec<Item<'a>>,
-        
+
         /// Optional step label (Extension)
         name: Option<Text<'a>>,
     },
@@ -168,6 +168,8 @@ bitflags! {
         const OPT            = 1 << 3;
         /// forces to create a new ingredient
         const NEW            = 1 << 4;
+        /// Marks the component as primary/active (*)
+        const PRIMARY        = 1 << 5;
     }
 }
 
