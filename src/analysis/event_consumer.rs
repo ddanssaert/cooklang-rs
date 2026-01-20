@@ -79,6 +79,8 @@ pub fn parse_events<'i, 'c>(
 
         locations: Default::default(),
         step_counter: 1,
+
+        output_ingredients: HashMap::new(),
     };
     col.parse_events(events)
 }
@@ -100,6 +102,8 @@ struct RecipeCollector<'i, 'c> {
 
     locations: Locations<'i>,
     step_counter: u32,
+
+    output_ingredients: HashMap<usize, usize>,
 }
 
 #[derive(Default)]
@@ -535,9 +539,26 @@ impl<'i> RecipeCollector<'i, '_> {
                 }
             }
 
-            Event::Ingredient(i) => items.push(Item::Ingredient {
-                index: self.ingredient(i),
-            }),
+            Event::Ingredient(i) => {
+                // Check if it is an Output
+                let is_output = i.modifiers.contains(Modifiers::OUTPUT);
+                
+                // Register the ingredient in the global list
+                let index = self.ingredient(i);
+                
+                if is_output {
+                    // 1. It IS an output:
+                    //    - Record which step defined it (for linking later)
+                    //    - Do NOT add it to 'items' (so it remains invisible in the step text)
+                    let step_index = self.current_section.content.len();
+                    self.output_ingredients.insert(index, step_index);
+                } else {
+                    // 2. It is NOT an output (standard ingredient):
+                    //    - Add it to 'items' so it renders in the step
+                    items.push(Item::Ingredient { index });
+                }
+            }
+
             Event::Cookware(i) => items.push(Item::Cookware {
                 index: self.cookware(i),
             }),
@@ -597,6 +618,10 @@ impl<'i> RecipeCollector<'i, '_> {
                 self.define_mode != DefineMode::Components,
             ),
         };
+
+        if new_igr.modifiers.contains(Modifiers::OUTPUT) {
+            new_igr.modifiers |= Modifiers::HIDDEN;
+        }
 
         if let Some(inter_data) = ingredient.intermediate_data {
             assert!(new_igr.modifiers().contains(Modifiers::REF));
@@ -743,6 +768,15 @@ impl<'i> RecipeCollector<'i, '_> {
                         number_quantity_span,
                         implicit,
                     ));
+                }
+            }
+
+            if definition.modifiers.contains(Modifiers::OUTPUT) {
+                if let Some(&step_index) = self.output_ingredients.get(&references_to) {
+                     new_igr.relation = IngredientRelation::reference(
+                         step_index, 
+                         IngredientReferenceTarget::Step
+                     );
                 }
             }
 
@@ -1228,6 +1262,23 @@ impl<'i> RecipeCollector<'i, '_> {
             None
         }
     }
+
+    fn find_step_index_for_ingredient(&self, ingredient_index: usize) -> Option<usize> {
+        // We iterate over the current section's content to find the step
+        for (content_idx, content) in self.current_section.content.iter().enumerate() {
+             if let Content::Step(step) = content {
+                 for item in &step.items {
+                     if let Item::Ingredient { index } = item {
+                         if *index == ingredient_index {
+                             return Some(content_idx);
+                         }
+                     }
+                 }
+             }
+        }
+        None
+    }
+
 }
 
 trait RefComponent: Sized {

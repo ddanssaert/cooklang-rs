@@ -166,7 +166,7 @@ async function run(): Promise<void> {
         ["PRIMARY_COMPONENT", 1 << 13],
         ["ACTIVE_TIME", 1 << 14],
         ["SCALABLE_TIMERS", 1 << 15],
-        // ["EXPLICIT_OUTPUTS", 1 << 16],
+        ["EXPLICIT_OUTPUTS", 1 << 16],
     ];
 
     extensions.forEach(([e, bits]) => {

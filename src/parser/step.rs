@@ -82,19 +82,35 @@ pub(crate) fn parse_step(bp: &mut BlockParser<'_, '_>) {
     while !bp.rest().is_empty() {
         let start_of_component = bp.current;
 
+        let is_arrow = if bp.at(T![-]) {
+            let tokens = bp.tokens();
+            if bp.current + 1 < tokens.len() {
+                tokens[bp.current + 1].kind == T![>] 
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
         // Try to parse a component
         let component = match bp.peek() {
             T![@] => bp.with_recover(ingredient),
             T![#] => bp.with_recover(cookware),
             T![~] => bp.with_recover(timer),
+            
+            // Handle '->'
+            T![-] if is_arrow && bp.extension(Extensions::EXPLICIT_OUTPUTS) => {
+                 bp.with_recover(explicit_output)
+            }
+            
             _ => None,
         };
 
         if let Some(ev) = component {
-            // A component was found! 
-            // 1. Flush any pending text we collected before this component
+            // Flush text before component
             if let Some(start) = text_start {
-                let end = start_of_component; // <--- This prevents overlap
+                let end = start_of_component;
                 let slice = &bp.tokens()[start..end];
                 if !slice.is_empty() {
                     let offset = slice[0].span.start();
@@ -103,11 +119,9 @@ pub(crate) fn parse_step(bp: &mut BlockParser<'_, '_>) {
                 }
                 text_start = None;
             }
-
-            // 2. Emit the component event
             bp.event(ev);
         } else {
-            // No component found (or parse failed). Treat this token as text.
+            // Treat as text
             if text_start.is_none() {
                 text_start = Some(bp.current);
             }
@@ -634,6 +648,57 @@ fn check_modifiers(bp: &mut BlockParser, modifiers_tokens: &[Token], container: 
             .hint("Modifiers are only available in ingredients and cookware items"),
         );
     }
+}
+
+fn explicit_output<'i>(bp: &mut BlockParser<'_, 'i>) -> Option<Event<'i>> {
+    let start = bp.current_offset();
+    
+    // 1. Consume "->"
+    bp.bump_any(); // -
+    bp.bump_any(); // >
+    
+    // 2. Consume whitespace
+    bp.consume_while(|k| k == T![ws]);
+    
+    // 3. Consume optional '@' 
+    let _ = bp.consume(T![@]);
+
+    let modifiers_pos = bp.current_offset();
+    
+    // 4. Parse Modifiers (false, false = no * or + allowed)
+    let modifiers_tokens = modifiers(bp, false, false);
+    
+    let name_offset = bp.current_offset();
+    let body = comp_body(bp)?;
+    let end = bp.current_offset();
+
+    // 5. Parse flags & Force OUTPUT
+    let parsed_modifiers = parse_modifiers(bp, modifiers_tokens, modifiers_pos);
+    
+    // FIX: Destructure to modify inner flags
+    let (mut flags, span) = check_intermediate_data(bp, parsed_modifiers, "explicit output").take_pair();
+    flags |= Modifiers::OUTPUT;
+    let modifiers = Located::new(flags, span);
+
+    // Validation
+    check_alias(bp, body.name, "explicit output");
+    check_note(bp, "explicit output");
+    let name = bp.text(name_offset, body.name);
+    check_empty_name("explicit output", bp, &name);
+
+    let quantity = body.quantity.map(|tokens| parse_quantity(bp, tokens).quantity);
+
+    Some(Event::Ingredient(Located::new(
+        Ingredient {
+            modifiers, // Use the fixed modifiers
+            intermediate_data: None,
+            name,
+            alias: None,
+            quantity,
+            note: None,
+        },
+        start..end,
+    )))
 }
 
 fn check_intermediate_data(
