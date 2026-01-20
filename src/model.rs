@@ -292,7 +292,8 @@ pub struct Cookware {
     pub note: Option<String>,
     /// How the cookware is related to others
     pub relation: ComponentRelation,
-    #[cfg_attr(feature = "ts", serde(skip))]
+    // #[cfg_attr(feature = "ts", serde(skip))]
+    #[serde(default, skip_serializing_if = "Modifiers::is_empty")]
     pub(crate) modifiers: Modifiers,
 }
 
