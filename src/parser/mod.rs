@@ -99,9 +99,9 @@ pub enum Event<'i> {
     /// guaranteed to be emitted. No other [`Event::Start`] will be emitted
     /// before the matching end event because `Cooklang` does not support nested
     /// blocks.
-    Start(BlockKind),
+    Start(BlockKind<'i>),
     /// End of an element that can contain others.
-    End(BlockKind),
+    End(BlockKind<'i>),
 
     /// Text item
     Text(Text<'i>),
@@ -126,9 +126,9 @@ pub enum Event<'i> {
 
 /// For [`Event::Start`] and [`Event::End`]
 #[derive(Debug, Clone, PartialEq)]
-pub enum BlockKind {
+pub enum BlockKind<'a> {
     /// A recipe step
-    Step,
+    Step { name: Option<Text<'a>> },
     /// A text paragraph
     ///
     /// Only `Event::Text` will be emitted inside.
