@@ -368,6 +368,7 @@ impl Scale for Timer<ScalableValue> {
         let scaled = Timer {
             name: self.name,
             quantity,
+            modifiers: self.modifiers, // <--- CHANGE 'timer' TO 'self'
         };
         (scaled, outcome)
     }
@@ -376,6 +377,7 @@ impl Scale for Timer<ScalableValue> {
         Timer {
             name: self.name,
             quantity: self.quantity.map(Quantity::default_scale),
+            modifiers: self.modifiers, // <--- CHANGE 'timer' TO 'self'
         }
     }
 }

@@ -1053,7 +1053,11 @@ impl<'i> RecipeCollector<'i, '_> {
 
         if timer.modifiers.contains(Modifiers::NEW) {
             if let Some(q) = &mut quantity {
-                q.scalable = true;
+                // 1. Match on a reference (&) so we don't move out
+                if let ScalableValue::Fixed(val) = &q.value {
+                    // 2. Clone the inner value to create the new variant
+                    q.value = ScalableValue::Linear(val.clone());
+                }
             }
         }
 
