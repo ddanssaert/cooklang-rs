@@ -345,7 +345,12 @@
         ["INLINE_QUANTITIES", 1 << 7],
         ["RANGE_VALUES", 1 << 9],
         ["TIMER_REQUIRES_TIME", 1 << 10],
-        ["INTERMEDIATE_PREPARATIONS", 1 << 11 | 1 << 1]
+        ["INTERMEDIATE_PREPARATIONS", 1 << 11 | 1 << 1],
+        ["STEP_LABELS", 1 << 12],
+        ["PRIMARY_COOKWARE", 1 << 13],
+        ["ACTIVE_TIME", 1 << 14],
+        ["SCALABLE_TIMERS", 1 << 15],
+        ["EXPLICIT_OUTPUTS", 1 << 16]
       ];
 
       extensions.forEach(([e, bits]) => {
