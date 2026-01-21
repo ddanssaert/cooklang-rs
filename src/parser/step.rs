@@ -613,8 +613,16 @@ fn timer<'i>(bp: &mut BlockParser<'_, 'i>) -> Option<Event<'i>> {
     if modifiers.contains(Modifiers::NEW) && !bp.extension(Extensions::SCALABLE_TIMERS) {
          return None;
     }
+
+    if modifiers.contains(Modifiers::HIDDEN) && !bp.extension(Extensions::HIDDEN_TIMERS) {
+         return None;
+    }
+
+    if modifiers.contains(Modifiers::OPT) && !bp.extension(Extensions::SILENT_TIMERS) {
+         return None;
+    }
     
-    let allowed = Modifiers::PRIMARY | Modifiers::NEW;
+    let allowed = Modifiers::PRIMARY | Modifiers::NEW | Modifiers::HIDDEN | Modifiers::OPT;
     if modifiers.intersects(!allowed) {
          bp.error(error!(
             "Invalid timer modifier",

@@ -138,6 +138,10 @@ bitflags! {
         const SCALABLE_TIMERS          = 1 << 15;
         /// Enables explicit output preparations
         const EXPLICIT_OUTPUTS         = 1 << 16;
+        /// Enable hidden timers
+        const HIDDEN_TIMERS            = 1 << 17;
+        /// Enable silent timers
+        const SILENT_TIMERS            = 1 << 18;
 
         /// Enables a subset of extensions to maximize compatibility with other
         /// cooklang parsers.
