@@ -83,6 +83,10 @@ pub fn parse_events<'i, 'c>(
         step_counter: 1,
 
         output_ingredients: HashMap::new(),
+
+        ingredient_sections: HashMap::new(),
+        
+        current_step_outputs: Vec::new(),
     };
     col.parse_events(events)
 }
@@ -107,6 +111,10 @@ struct RecipeCollector<'i, 'c> {
     step_counter: u32,
 
     output_ingredients: HashMap<usize, usize>,
+
+    ingredient_sections: HashMap<usize, usize>,
+
+    current_step_outputs: Vec<usize>,
 }
 
 #[derive(Default)]
@@ -169,6 +177,7 @@ impl<'i> RecipeCollector<'i, '_> {
                                 items,
                                 number: self.step_counter,
                                 name: name.map(|t| t.text_trimmed().into_owned()), 
+                                outputs: std::mem::take(&mut self.current_step_outputs),
                             })
                         }
                         Some(BlockBuffer::Text(text)) => {
@@ -560,6 +569,13 @@ impl<'i> RecipeCollector<'i, '_> {
                 
                 // Register the ingredient in the global list
                 let index = self.ingredient(i);
+
+                if is_output {
+                    // Current section index is the number of completed sections
+                    // (since current_section is not yet pushed to content.sections)
+                    let sect_idx = self.content.sections.len();
+                    self.ingredient_sections.insert(index, sect_idx);
+                }
                 
                 if is_output {
                     // 1. It IS an output:
@@ -567,6 +583,8 @@ impl<'i> RecipeCollector<'i, '_> {
                     //    - Do NOT add it to 'items' (so it remains invisible in the step text)
                     let step_index = self.current_section.content.len();
                     self.output_ingredients.insert(index, step_index);
+
+                    self.current_step_outputs.push(index);
                 } else {
                     // 2. It is NOT an output (standard ingredient):
                     //    - Add it to 'items' so it renders in the step
@@ -781,11 +799,42 @@ impl<'i> RecipeCollector<'i, '_> {
             }
 
             if definition.modifiers.contains(Modifiers::OUTPUT) {
-                if let Some(&step_index) = self.output_ingredients.get(&references_to) {
-                     new_igr.relation = IngredientRelation::reference(
-                         step_index, 
-                         IngredientReferenceTarget::Step
-                     );
+                
+                // 1. Get current section index
+                let current_section_idx = self.content.sections.len();
+                
+                // 2. Get definition section index (default to current if missing)
+                let def_section_idx = *self.ingredient_sections.get(&references_to).unwrap_or(&current_section_idx);
+
+                // 3. Check if Local or Global
+                let is_local = def_section_idx == current_section_idx;
+
+                if is_local {
+                     // SAME SECTION -> Link to Step
+                     if let Some(&step_index) = self.output_ingredients.get(&references_to) {
+                         new_igr.relation = IngredientRelation {
+                             relation: ComponentRelation::Reference { 
+                                 references_to: step_index,
+                                 target: None,
+                             },
+                             reference_target: Some(IngredientReferenceTarget::Step),
+                         };
+                     } else {
+                         // Fallback (shouldn't happen for outputs)
+                         new_igr.relation = IngredientRelation {
+                             relation: ComponentRelation::Reference { references_to, target: None },
+                             reference_target: Some(IngredientReferenceTarget::Ingredient),
+                         };
+                     }
+                } else {
+                     // DIFFERENT SECTION -> Link to Ingredient (Global)
+                     new_igr.relation = IngredientRelation {
+                         relation: ComponentRelation::Reference { 
+                             references_to, // Use Global ID
+                             target: None 
+                         },
+                         reference_target: Some(IngredientReferenceTarget::Ingredient),
+                     };
                 }
             }
 
@@ -1364,8 +1413,13 @@ impl RefComponent for Ingredient<ScalableValue> {
 
     #[inline]
     fn set_reference(&mut self, references_to: usize) {
-        self.relation =
-            IngredientRelation::reference(references_to, IngredientReferenceTarget::Ingredient);
+        self.relation = IngredientRelation {
+            relation: ComponentRelation::Reference {
+                references_to,
+                target: None,
+            },
+            reference_target: None,
+        };
     }
 
     fn set_referenced_from(all: &mut [Self], references_to: usize) {
@@ -1416,7 +1470,7 @@ impl RefComponent for Cookware<ScalableValue> {
 
     #[inline]
     fn set_reference(&mut self, references_to: usize) {
-        self.relation = ComponentRelation::Reference { references_to };
+        self.relation = ComponentRelation::Reference { references_to, target: None };
     }
 
     fn set_referenced_from(all: &mut [Self], references_to: usize) {

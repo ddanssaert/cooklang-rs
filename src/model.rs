@@ -138,7 +138,10 @@ pub struct Step {
     pub number: u32,
 
     /// Optional step label
-    pub name: Option<String>
+    pub name: Option<String>,
+
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub outputs: Vec<usize>,
 }
 
 /// A step item
@@ -368,6 +371,8 @@ pub enum ComponentRelation {
     Reference {
         /// Index of the definition component
         references_to: usize,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        target: Option<IngredientReferenceTarget>,
     },
 }
 
@@ -388,7 +393,7 @@ impl ComponentRelation {
     pub fn references_to(&self) -> Option<usize> {
         match self {
             ComponentRelation::Definition { .. } => None,
-            ComponentRelation::Reference { references_to } => Some(*references_to),
+            ComponentRelation::Reference { references_to, .. } => Some(*references_to),
         }
     }
 
@@ -420,8 +425,8 @@ impl ComponentRelation {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct IngredientRelation {
     #[serde(flatten)]
-    relation: ComponentRelation,
-    reference_target: Option<IngredientReferenceTarget>,
+    pub relation: ComponentRelation,
+    pub reference_target: Option<IngredientReferenceTarget>,
 }
 
 /// Target an ingredient reference references to
@@ -454,7 +459,7 @@ impl IngredientRelation {
         reference_target: IngredientReferenceTarget,
     ) -> Self {
         Self {
-            relation: ComponentRelation::Reference { references_to },
+            relation: ComponentRelation::Reference { references_to, target: None },
             reference_target: Some(reference_target),
         }
     }
