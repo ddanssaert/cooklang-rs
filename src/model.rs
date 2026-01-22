@@ -138,7 +138,10 @@ pub struct Step {
     pub number: u32,
 
     /// Optional step label
-    pub name: Option<String>
+    pub name: Option<String>,
+
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub outputs: Vec<usize>,
 }
 
 /// A step item

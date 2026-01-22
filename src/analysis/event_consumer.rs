@@ -83,6 +83,8 @@ pub fn parse_events<'i, 'c>(
         step_counter: 1,
 
         output_ingredients: HashMap::new(),
+
+        current_step_outputs: Vec::new(),
     };
     col.parse_events(events)
 }
@@ -107,6 +109,8 @@ struct RecipeCollector<'i, 'c> {
     step_counter: u32,
 
     output_ingredients: HashMap<usize, usize>,
+
+    current_step_outputs: Vec<usize>,
 }
 
 #[derive(Default)]
@@ -169,6 +173,7 @@ impl<'i> RecipeCollector<'i, '_> {
                                 items,
                                 number: self.step_counter,
                                 name: name.map(|t| t.text_trimmed().into_owned()), 
+                                outputs: std::mem::take(&mut self.current_step_outputs),
                             })
                         }
                         Some(BlockBuffer::Text(text)) => {
@@ -567,6 +572,8 @@ impl<'i> RecipeCollector<'i, '_> {
                     //    - Do NOT add it to 'items' (so it remains invisible in the step text)
                     let step_index = self.current_section.content.len();
                     self.output_ingredients.insert(index, step_index);
+
+                    self.current_step_outputs.push(index);
                 } else {
                     // 2. It is NOT an output (standard ingredient):
                     //    - Add it to 'items' so it renders in the step
