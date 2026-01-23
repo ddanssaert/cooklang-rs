@@ -500,7 +500,11 @@ impl IngredientRelation {
     pub fn references_to(&self) -> Option<(usize, IngredientReferenceTarget)> {
         self.relation
             .references_to()
-            .map(|index| (index, self.reference_target.unwrap()))
+            .map(|index| (
+                index, 
+                // Fallback to 'Ingredient' instead of crashing if target is missing
+                self.reference_target.unwrap_or(IngredientReferenceTarget::Ingredient)
+            ))
     }
 
     /// Checks if the relation is a regular reference to an ingredient
